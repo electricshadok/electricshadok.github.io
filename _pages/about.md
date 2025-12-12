@@ -1,14 +1,11 @@
 ---
 permalink: /
-title: "Infos"
+title: "Hi there! 👋 I'm Vincent"
 author_profile: true
 redirect_from: 
   - /about/
   - /about.html
 ---
-
-Hi there! 👋 I'm Vincent
-======
 
 I am an experienced Software Engineer passionate about the intersection of **Machine Learning, Computer Graphics, and Physics Simulations**. With over a decade of experience, my work spans from developing large-scale simulation tools for major motion pictures (*Gravity*, *Paddington*, *Guardians of the Galaxy*, *Avatar 2*) to building ML technologies. This includes [real-time face animation](https://www.youtube.com/watch?v=iQPozzcD6us) at **Ziva/Unity**—presented at [SIGGRAPH 2022](https://www.youtube.com/watch?si=wTASo4yaFfBVaHBV&t=2669&v=MAXJWEoKbxY&feature=youtu.be)—and synthetic data generation for bio-authentication at **Meta/Reality Labs**.
 
