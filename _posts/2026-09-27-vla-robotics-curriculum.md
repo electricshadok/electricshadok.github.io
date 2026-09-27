@@ -28,15 +28,18 @@ A **visual encoder** maps raw pixel observations — RGB images from wrist or he
 
 Most VLAs use encoders **pretrained on internet-scale image or video data** and kept frozen during policy training, treating them as general-purpose perception backbones.
 
-| Encoder | Year | Authors | Architecture | Key Property for Robotics |
-|---|:---:|---|---|---|
-| **ViT** | 2020 | Dosovitskiy et al. | **Patch tokenization** + multi-head self-attention | First pure-Transformer image encoder; each spatial patch becomes an independent token |
-| **CLIP** | 2021 | Radford et al. (OpenAI) | **Contrastive language-image pretraining** | Visual features semantically aligned to natural language — strong zero-shot grounding |
-| **R3M** | 2022 | Nair et al. (Meta) | **Time-contrastive** + language-video alignment | Representation pretraining on human video — optimized for motor control, not classification; widely used as a frozen backbone |
-| **MVP** | 2022 | Radosavovic et al. | **Masked Autoencoder (MAE)** pretraining | Learns dense spatially grounded features via masked patch reconstruction |
+| Encoder | Year | Authors | Architecture | Output Shape | Key Property for Robotics |
+|---|:---:|---|---|---|---|
+| **ViT-B/16** | 2020 | Dosovitskiy et al. | **Patch tokenization** + multi-head self-attention | `[197, 768]` ¹ | First pure-Transformer image encoder; each spatial patch becomes an independent token |
+| **CLIP ViT-L/14** | 2021 | Radford et al. (OpenAI) | **Contrastive language-image pretraining** | `[257, 1024]` ² | Visual features semantically aligned to natural language — strong zero-shot grounding |
+| **R3M** | 2022 | Nair et al. (Meta) | **Time-contrastive** + language-video alignment (ResNet-50) | `[1, 2048]` | Representation pretraining on human video — optimized for motor control, not classification; widely used as a frozen backbone |
+| **MVP ViT-B** | 2022 | Radosavovic et al. | **Masked Autoencoder (MAE)** pretraining | `[197, 768]` ¹ | Learns dense spatially grounded features via masked patch reconstruction |
+| **DINOv2 ViT-B/14** | 2023 | Oquab et al. (Meta) | Self-supervised ViT + **knowledge distillation** | `[257, 768]` ² | Strong out-of-the-box dense spatial features; no language supervision required |
+| **SigLIP-So400m/14** | 2023 | Zhai et al. (Google) | **Sigmoid contrastive** vision-language pretraining | `[256, 1152]` ³ | Outperforms CLIP on robotics benchmarks; backbone of choice in OpenVLA and π0 |
 
-| **DINOv2** | 2023 | Oquab et al. (Meta) | Self-supervised ViT + **knowledge distillation** | Strong out-of-the-box dense spatial features; no language supervision required |
-| **SigLIP** | 2023 | Zhai et al. (Google) | **Sigmoid contrastive** vision-language pretraining | Outperforms CLIP on robotics benchmarks; backbone of choice in OpenVLA and π0 |
+> ¹ 224×224 input, patch 16 → (224÷16)² = 196 patches + 1 CLS token = **197** tokens, dim **768** (ViT-B).
+> ² 224×224 input, patch 14 → (224÷14)² = 256 patches + 1 CLS = **257** tokens, dim **1024** (ViT-L) / **768** (ViT-B).
+> ³ SigLIP has no CLS token → 256 patch tokens only; dim **1152** for So400m. OpenVLA uses 224×224 → 256 tokens; π0/PaliGemma uses 448×448 → 1024 tokens.
 
 ---
 
@@ -46,13 +49,13 @@ A **language encoder** maps natural language task descriptions — *"pick up the
 
 Early VLAs used lightweight encoders (BERT, T5) purely for **instruction conditioning** — injecting task embeddings into a separate visual policy via **FiLM layers** or cross-attention. Modern VLAs instead treat the language model as the **policy backbone** itself, letting it directly generate action tokens as an extension of its **next-token prediction objective**.
 
-| Encoder | Year | Authors | Architecture | Role in VLA |
-|---|:---:|---|---|---|
-| **BERT** | 2018 | Devlin et al. (Google) | Bidirectional Transformer **encoder** | Task embedding for early conditioned policies (e.g., CLIPort) |
-| **T5** | 2019 | Raffel et al. (Google) | **Encoder-decoder** Transformer | Instruction conditioning via **FiLM** in RT-1 and SayCan affordance models |
-| **PaLM** | 2022 | Chowdhery et al. (Google) | **Decoder-only**, 540B parameters | High-capacity semantic reasoning; backbone for SayCan task planning and RT-2 action generation |
-| **LLaMA 2** | 2023 | Touvron et al. (Meta) | **Decoder-only**, 7B–70B | Open-source backbone widely adapted for VLA fine-tuning (e.g., OpenVLA variants) |
-| **Gemma** | 2024 | Google DeepMind | **Decoder-only**, 2B–7B | Backbone for OpenVLA (Prismatic) and π0 via PaliGemma |
+| Encoder | Year | Authors | Architecture | Output Shape | Role in VLA |
+|---|:---:|---|---|---|---|
+| **BERT-base** | 2018 | Devlin et al. (Google) | Bidirectional Transformer **encoder** | `[seq_len, 768]` | Task embedding for early conditioned policies (e.g., CLIPort) |
+| **T5-base / T5-large** | 2019 | Raffel et al. (Google) | **Encoder-decoder** Transformer | `[seq_len, 768]` / `[seq_len, 1024]` | Instruction conditioning via **FiLM** in RT-1 and SayCan affordance models |
+| **PaLM 540B** | 2022 | Chowdhery et al. (Google) | **Decoder-only**, 540B parameters | `[seq_len, 18432]` | High-capacity semantic reasoning; backbone for SayCan task planning and RT-2 action generation |
+| **LLaMA 2** | 2023 | Touvron et al. (Meta) | **Decoder-only**, 7B–70B | `[seq_len, 4096]` (7B) / `[seq_len, 8192]` (70B) | Open-source backbone widely adapted for VLA fine-tuning (e.g., OpenVLA variants) |
+| **Gemma** | 2024 | Google DeepMind | **Decoder-only**, 2B–7B | `[seq_len, 2048]` (2B) / `[seq_len, 3072]` (7B) | Backbone for OpenVLA (Prismatic) and π0 via PaliGemma |
 
 ---
 
