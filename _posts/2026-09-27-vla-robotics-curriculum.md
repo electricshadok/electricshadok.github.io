@@ -32,8 +32,9 @@ Most VLAs use encoders **pretrained on internet-scale image or video data** and 
 |---|:---:|---|---|---|
 | **ViT** | 2020 | Dosovitskiy et al. | **Patch tokenization** + multi-head self-attention | First pure-Transformer image encoder; each spatial patch becomes an independent token |
 | **CLIP** | 2021 | Radford et al. (OpenAI) | **Contrastive language-image pretraining** | Visual features semantically aligned to natural language — strong zero-shot grounding |
-| **R3M** | 2022 | Nair et al. (Meta) | **Time-contrastive** + language-video alignment | Encoder specifically optimized for motor control via human video, not classification |
+| **R3M** | 2022 | Nair et al. (Meta) | **Time-contrastive** + language-video alignment | Representation pretraining on human video — optimized for motor control, not classification; widely used as a frozen backbone |
 | **MVP** | 2022 | Radosavovic et al. | **Masked Autoencoder (MAE)** pretraining | Learns dense spatially grounded features via masked patch reconstruction |
+
 | **DINOv2** | 2023 | Oquab et al. (Meta) | Self-supervised ViT + **knowledge distillation** | Strong out-of-the-box dense spatial features; no language supervision required |
 | **SigLIP** | 2023 | Zhai et al. (Google) | **Sigmoid contrastive** vision-language pretraining | Outperforms CLIP on robotics benchmarks; backbone of choice in OpenVLA and π0 |
 
@@ -59,6 +60,10 @@ Early VLAs used lightweight encoders (BERT, T5) purely for **instruction conditi
 
 The action head and fusion mechanism are what transform a vision-language model into a robot policy. Three main families have emerged, each with a different inductive bias.
 
+**Inputs to the Action Head — Including Proprioception:**
+
+RGB images (V) and language (L) are the most visible inputs, but physical manipulation also requires the current **robot state** — joint positions *q*, joint velocities *q̇*, and gripper aperture. This **proprioceptive state** is typically not passed through the vision transformer; instead it is concatenated directly into the **action head's conditioning MLP**, giving the low-level controller immediate awareness of where the robot's body currently is in configuration space.
+
 **Action Prediction Strategies:**
 
 * **Tokenized discrete actions** — continuous joint angles or end-effector deltas are **discretized into fixed bins** (e.g., 256 bins per DoF) and predicted as regular vocabulary tokens. Used by RT-1, RT-2, and Gato. Simple to implement on any LLM, but quantization limits precision for fine-grained control.
@@ -67,13 +72,22 @@ The action head and fusion mechanism are what transform a vision-language model 
 
 * **Flow matching** — actions are generated via **continuous normalizing flows**, learning a straight-line ODE path from noise to action distribution. Faster and more training-stable than DDPM. Used by π0 and currently the state-of-the-art approach for dexterous manipulation.
 
-* **Action chunking** — instead of predicting single-step actions, the policy predicts a short-horizon **action sequence** (chunk) at each timestep. Reduces **compounding closed-loop errors** and enables smoother trajectories.
+* **Action chunking** — pioneered by **ACT** *(Zhao et al., 2023)*, instead of predicting single-step actions the policy predicts a short-horizon **action sequence** (chunk) at each timestep, with **temporal ensembling** to smooth overlapping predictions. Reduces **compounding closed-loop errors** and is now standard practice across Octo, π0, and GR00T.
 
 **Multimodal Fusion Strategies:**
 
 * **Linear projection** (LLaVA-style): visual encoder outputs are projected into the LLM's **token embedding space** and prepended as soft visual tokens before the language sequence.
 * **Cross-attention** (Flamingo-style): language transformer layers attend over visual tokens at **every block** via dedicated cross-attention, preserving visual context throughout the full forward pass.
 * **Token interleaving** (Gato): all modalities — image patches, language tokens, action tokens — are flattened into a single **autoregressive token sequence** processed by one Transformer.
+
+**Decoupled Execution Frequencies — System 1 & System 2:**
+
+A 7B–22B VLM backbone can rarely run faster than **5–10 Hz** on embedded robot compute — far too slow for stable closed-loop motor control. Modern high-performance VLAs solve this with a **dual-loop architecture**:
+
+* **Slow loop (~5–10 Hz, System 2):** The VLM processes image tokens and natural language, outputting **task-context embeddings** or latent goal tokens. This is the reasoning layer — it understands *what* to do.
+* **Fast loop (~50–120 Hz, System 1):** A lightweight **action expert** (flow matching head, DiT, or diffusion MLP) takes the latent context plus current **proprioceptive state** and generates high-frequency **action chunks**. This is the motor layer — it handles *how* to move.
+
+π0's flow-matching action expert and GR00T's Diffusion Transformer head are canonical examples of this split. The architecture bridges the gap between VLM-level semantic reasoning and the real-time closed-loop stability required for physical manipulation.
 
 ---
 
@@ -99,13 +113,13 @@ The action head and fusion mechanism are what transform a vision-language model 
 | **2** | 2022 | **SayCan** *(Ahn et al., Google)* | Per-skill value networks | PaLM (540B) | **Affordance value functions** per primitive skill | An LLM generates candidate plans in natural language; each step is scored by a learned **value function** estimating physical feasibility — grounding abstract language reasoning in robot affordances. | [arXiv:2204.01691](https://arxiv.org/abs/2204.01691) |
 | **3** | 2022 | **Gato** *(Reed et al., DeepMind)* | ViT patch tokens | Byte-pair tokens (SentencePiece) | **Autoregressive token prediction** | A single **generalist Transformer** processes image patches, language, and actions as a flat **interleaved token sequence** across 600+ tasks. Actions are discretized into vocabulary tokens like any other output. | [arXiv:2205.06175](https://arxiv.org/abs/2205.06175) |
 | **4** | 2022 | **RT-1** *(Brohan et al., Google)* | EfficientNet-B3 + **TokenLearner** | T5 (**FiLM** conditioning) | **Tokenized discrete actions** (256 bins/DoF) | A dedicated **Robotics Transformer** trained on 130k real-robot demonstrations. **FiLM layers** inject T5 language embeddings into the visual feature stream; the output head predicts discretized joint commands. | [arXiv:2212.06817](https://arxiv.org/abs/2212.06817) |
-| **5** | 2022 | **R3M** *(Nair et al., Meta)* | **Time-contrastive ViT** | CLIP text (alignment signal) | Downstream task-specific policy | A visual pretraining framework using **temporal contrastive learning** on human videos and **video-language alignment** to learn motor-relevant representations — without any robot data. | [arXiv:2203.12601](https://arxiv.org/abs/2203.12601) |
+| **5** | 2023 | **ACT** *(Zhao et al.)* | ResNet / ViT (per camera) | BERT (joint embeddings) | **Action chunking** + **temporal ensembling** | Introduces **chunked trajectory prediction** — the policy outputs a short sequence of actions at each timestep and blends overlapping chunks via temporal ensembling — establishing the standard mechanism to mitigate compounding single-step drift. | [arXiv:2304.13705](https://arxiv.org/abs/2304.13705) |
 | **6** | 2023 | **RoboFlamingo** *(Li et al.)* | CLIP ViT (Flamingo) | OpenFlamingo LLM | **MLP action decoder** | Fine-tunes **OpenFlamingo** on robot manipulation data using its native **cross-attention over visual tokens** to condition an action MLP. Demonstrates strong **few-shot generalization** from language-conditioned rollouts. | [arXiv:2311.01378](https://arxiv.org/abs/2311.01378) |
 | **7** | 2023 | **RT-2** *(Brohan et al., Google)* | PaLI-X ViT (22B) | PaLM-E / PaLI-X | **Co-fine-tuned text tokens** as actions | **Co-fine-tunes** a VLM on robot data *alongside* web data so the model retains language understanding while learning to emit action tokens. Unlocks **emergent chain-of-thought reasoning** — the robot follows novel multi-step instructions unseen during robot training. | [arXiv:2307.15818](https://arxiv.org/abs/2307.15818) |
-| **8** | 2024 | **Octo** *(Octo Team, UC Berkeley)* | ViT (frozen) | Small GPT-style Transformer | **Diffusion action head** | An **open-source generalist robot policy** trained on the Open X-Embodiment dataset. Task tokens (language + goal images) are fused via **cross-attention**; actions are decoded by a **DDPM diffusion head** that captures multimodal action distributions. | [arXiv:2405.12213](https://arxiv.org/abs/2405.12213) |
+| **8** | 2024 | **Octo** *(Octo Team, UC Berkeley)* | ViT (frozen) | Small GPT-style Transformer | **Diffusion action head** + action chunking | An **open-source generalist robot policy** trained on the Open X-Embodiment dataset. Task tokens (language + goal images) are fused via **cross-attention**; actions are decoded by a **DDPM diffusion head** that captures multimodal action distributions. | [arXiv:2405.12213](https://arxiv.org/abs/2405.12213) |
 | **9** | 2024 | **OpenVLA** *(Kim et al., Stanford)* | **SigLIP + DINOv2** (dual encoder) | Llama 2 / Gemma (7B) | **Tokenized discrete actions** | An **open-source 7B VLA** built on Prismatic. Uses a **dual vision encoder** — SigLIP for language-aligned semantics, DINOv2 for dense spatial structure — projected into an LLM that outputs discretized robot actions as vocabulary tokens. | [arXiv:2406.09246](https://arxiv.org/abs/2406.09246) |
-| **10** | 2024 | **π0** *(Black et al., Physical Intelligence)* | SigLIP (via PaliGemma) | Gemma (via PaliGemma) | **Flow matching action expert** | Attaches a **flow matching action expert** to a frozen PaliGemma VLM backbone. The expert generates **continuous action trajectories** by solving a straight-line ODE from noise to actions — achieving state-of-the-art on dexterous bimanual manipulation. | [arXiv:2410.24164](https://arxiv.org/abs/2410.24164) |
+| **10** | 2024 | **π0** *(Black et al., Physical Intelligence)* | SigLIP (via PaliGemma) | Gemma (via PaliGemma) | **Flow matching action expert** (fast loop, ~50 Hz) | Attaches a **flow matching action expert** to a PaliGemma VLM backbone — a canonical **System 1/2 split**: VLM runs at ~5 Hz for semantic reasoning; the action expert consumes latent context + proprioception at ~50 Hz for real-time control. | [arXiv:2410.24164](https://arxiv.org/abs/2410.24164) |
 | **11** | 2024 | **GR-2** *(Chang et al.)* | ViT pretrained on video | T5 | **Transformer action decoder** | Pretrains a **video generation model** on large-scale internet video to implicitly learn world dynamics, then fine-tunes it as a robot policy — using **generated future frames** as a planning signal. | [arXiv:2410.06158](https://arxiv.org/abs/2410.06158) |
 | **12** | 2024 | **RoboVLMs** *(Li et al.)* | CLIP / SigLIP / DINOv2 | LLaMA / Qwen / InternLM | Various | A **systematic benchmark** evaluating which VLM design choices — encoder selection, LLM scale, fusion strategy, fine-tuning recipe — matter most when adapting VLMs to robot manipulation. Essential reading before building your own VLA. | [arXiv:2406.13287](https://arxiv.org/abs/2406.13287) |
 | **13** | 2025 | **π0.5** *(Physical Intelligence)* | SigLIP + video features | Gemma (large) | **Flow matching**, language-conditioned | Extends π0 with **internet-scale video pretraining** and a stronger language backbone, enabling generalization to household manipulation tasks in novel environments without task-specific demonstrations. | [arXiv:2504.16054](https://arxiv.org/abs/2504.16054) |
-| **14** | 2025 | **GR00T N1** *(NVIDIA)* | ViT (multi-view) | LLM backbone | **Diffusion Transformer (DiT)** action head | NVIDIA's **open foundation robot policy** trained on diverse cross-embodiment data. Uses a **Diffusion Transformer** action head and a multi-view visual encoder, targeting humanoid and dexterous manipulation robots. | [arXiv:2503.14734](https://arxiv.org/abs/2503.14734) |
+| **14** | 2025 | **GR00T N1** *(NVIDIA)* | ViT (multi-view) | LLM backbone | **DiT action head** (fast loop, ~120 Hz) | NVIDIA's **open foundation robot policy**. Uses a **Diffusion Transformer** action head operating at high frequency on proprioception + VLM latents, while the VLM slow-loop handles scene understanding — a full **System 1/2 decoupled** architecture for humanoid and dexterous robots. | [arXiv:2503.14734](https://arxiv.org/abs/2503.14734) |
