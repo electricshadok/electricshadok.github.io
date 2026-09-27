@@ -105,6 +105,67 @@ A 7B–22B VLM backbone can rarely run faster than **5–10 Hz** on embedded rob
 
 ---
 
+## 📦 Training Data for VLAs
+
+Training a VLA requires data at two distinct levels, reflecting the two-phase regime most modern systems adopt:
+
+1. **Internet-scale pretraining** — images, video, and text from the web give the model semantic understanding and physical common sense before it sees any robot data.
+2. **Robot-specific fine-tuning** — real or simulated demonstrations with language annotations ground the pretrained representations into actionable motor policies.
+
+The data bottleneck is real: collecting high-quality **robot teleoperation demonstrations** is expensive and slow. This is why cross-embodiment dataset aggregation (pooling data across many robot types) and human video pretraining have become critical strategies.
+
+### Real-Robot Demonstration Datasets
+
+Collected via human teleoperation or kinesthetic teaching. These are the fine-tuning datasets that teach the robot *how to act*.
+
+| Dataset | Year | Scale | Setup | Key Property | Used By |
+|---|:---:|---|---|---|---|
+| **Fractal / RT-1 Data** | 2022 | 130k episodes, 700+ tasks | Google mobile manipulation robot | Large-scale proprietary real-robot data; first dataset at this scale for a single embodiment | RT-1, RT-2 |
+| **Language Table** | 2022 | 442k episodes | Tabletop, suction arm | Dense **natural language annotations** per trajectory step — fine-grained instruction conditioning | PaLM-E |
+| **BridgeData V2** | 2023 | 60k episodes, 24 environments | WidowX arm, tabletop | Fully open-source; diverse household tasks across many scenes | Octo, OpenVLA |
+| **ALOHA datasets** | 2023 | ~1k–50k episodes per task | Bimanual ALOHA arms | High-dexterity **bimanual** demonstrations via low-cost teleoperation; paired with ACT | ACT, π0 |
+| **DROID** | 2024 | 76k episodes, 564 scenes, 86 tasks | UR5 / Franka, in-the-wild labs | **In-the-wild** diversity — 50+ institutions, varied lighting and clutter; designed for generalization | π0, π0.5 |
+
+---
+
+### Cross-Embodiment Aggregated Datasets
+
+Aggregate demonstrations across many robot types and labs into a single training corpus. The goal is to maximize behavioral diversity and reduce per-embodiment data requirements.
+
+| Dataset | Year | Scale | Coverage | Key Property |
+|---|:---:|---|---|---|
+| **Open X-Embodiment (OXE)** | 2023 | ~1M episodes, 22 datasets | 22 robot types, 527 skills | The **ImageNet of robot learning** — first large-scale cross-embodiment dataset; enables training a single policy across many robot bodies |
+| **LeRobot Dataset** *(Hugging Face)* | 2024 | Growing, community-contributed | Multiple embodiments | Standardized **open-source format** (HDF5 + metadata) to unify robot datasets; lowers barrier to contribution and reuse |
+
+---
+
+### Human Video Datasets (Visual Encoder Pretraining)
+
+Used to pretrain **visual encoders** (V) before any robot data is seen. Human video provides rich physical common sense — object permanence, contact dynamics, goal-directed motion — without requiring a robot at all.
+
+| Dataset | Year | Scale | Domain | Used For |
+|---|:---:|---|---|---|
+| **Ego4D** | 2022 | 3,600h ego-centric video | Daily activities (cooking, construction, sports) | **R3M** temporal contrastive pretraining; **V-JEPA** masked feature prediction |
+| **Epic Kitchens** | 2018/2021 | 700h, 90k clips | Kitchen manipulation | Object-interaction visual pretraining; action recognition backbone training |
+| **Something-Something v2** | 2017 | 220k clips | Object–hand interactions | Relational visual understanding (moving X behind Y, pushing X to Y) |
+| **Large-scale internet video** | — | Billions of frames | Web-scraped (YouTube etc.) | **π0.5** and **GR-2** use internet video at scale for world-model-style pretraining before robot fine-tuning |
+
+---
+
+### Simulation Benchmarks (Evaluation & Synthetic Pretraining)
+
+Used for **controlled evaluation** of generalization, and sometimes for **synthetic data generation** (sim-to-real). They are not typically sufficient as sole training data for real-world VLAs.
+
+| Benchmark | Year | Tasks | Simulator | Key Property |
+|---|:---:|---|---|---|
+| **Meta-World** | 2019 | 50 manipulation tasks | MuJoCo | Standard **multi-task** manipulation benchmark; widely used for algorithmic comparisons |
+| **RLBench** | 2019 | 100 tasks | CoppeliaSim | **100 diverse tasks** with language descriptions; used for language-conditioned policy evaluation |
+| **CALVIN** | 2022 | Long-horizon, language-conditioned | PyBullet | Evaluates **multi-step** instruction following over 5+ subtask chains |
+| **LIBERO** | 2023 | 130 tasks across 4 task suites | MuJoCo | Designed to study **knowledge transfer** and **lifelong learning** across task families |
+| **Isaac Lab** | 2024 | Configurable | NVIDIA Isaac Sim | GPU-parallelized simulation for **large-scale synthetic data** generation; used for humanoid pretraining |
+
+---
+
 ## 🗺️ The VLA Curriculum Table
 
 | # | Year | Model | V Encoder | L Encoder | Action Head | Summary | Link |
