@@ -13,11 +13,11 @@ Model-Based Reinforcement Learning has transformed over the past decade. What st
 
 If you want to understand how world models actually work, reading papers at random won't get you far. You need to follow the story of why older architectures failed, what ideas fixed them, and how modern techniques manage **long-horizon planning** without **compounding rollout errors** — the gradual drift that turns predictions into nonsense.
 
-Here is a 17-paper roadmap broken down into three chronological phases.
+Here is an 18-paper roadmap broken down into four chronological and conceptual phases.
 
 ---
 
-## The Three Acts of World Model Evolution
+## The Four Acts of World Model Evolution
 
 ### Act I: The Latent State Foundations (2018–2020)
 * **The Problem:** How can an agent predict future states without incurring the prohibitive cost of **pixel-level reconstruction** — predicting every pixel on screen?
@@ -29,10 +29,15 @@ Here is a 17-paper roadmap broken down into three chronological phases.
 * **The Breakthrough:** **Categorical latent spaces**, reward normalization, and **attention-based sequence models**.
 * *DreamerV2* replaced Gaussian latents with **straight-through categorical representations** — discrete slots instead of smooth continuous values — reducing **posterior collapse** and latent drift in Atari games. *DayDreamer* extended this to real physical robots without **sim-to-real transfer**. *DreamerV3* introduced **symlog normalization** — a simple log-scaling transform — so a single set of hyperparameters generalized across domains, from locomotion to finding diamonds in Minecraft. Meanwhile, *TransDreamer*, *IRIS*, and *Δ-IRIS* replaced **recurrent state-space models (RSSMs)** with **attention-based sequence models**, representing observations as **discrete token sequences** via VQ-based tokenization.
 
-### Act III: Diffusion and Latent Feature Prediction (2024–2026)
-* **The Problem:** **VQ tokenization** fails to preserve **high-frequency spatial structure** — sharp geometry and subtle physics — while **autoregressive token generation** is slow and prone to visual artifacts over long sequences.
-* **The Breakthrough:** **Denoising diffusion probabilistic models (DDPMs)** for simulation and **non-generative latent feature prediction** as a self-supervised objective.
-* *DIAMOND* and *Oasis* applied **latent diffusion** directly to world modeling — enabling **high-fidelity, temporally consistent environment simulation** (crisp, physically believable frame-by-frame rollouts) in real time. Meanwhile, Meta's *V-JEPA* demonstrated that **masked feature prediction** in a frozen embedding space — predicting abstract representations rather than raw pixels — yields stronger **physical inductive bias** and sample efficiency. This culminates in *Dreamer 4* and *JEDI*, which combine **JEPA-style representation learning** with **fast stochastic latent diffusion** for efficient multi-step rollouts across multiple possible futures.
+### Act III: Generative Diffusion & Neural Simulation Engines (2024–2025)
+* **The Problem:** **VQ tokenization** fails to preserve **high-frequency spatial structure** — sharp geometry and subtle physics — while **autoregressive rollout generation** is slow and prone to compounding visual artifacts.
+* **The Breakthrough:** **Denoising diffusion probabilistic models (DDPMs)** and **block-causal foundation models** for high-fidelity interactive simulation.
+* *DIAMOND* and *Oasis* applied **latent diffusion** directly to world modeling, creating real-time interactive neural game engines capable of simulating complex, physically grounded 3D environments from keyboard and mouse inputs. *Δ-IRIS* restricted prediction to changing delta tokens, and *Dreamer 4* scaled block-causal Transformers over internet-scale video pretraining to enable stable long-horizon imagination.
+
+### Act IV: The JEPA Shift & Hierarchical World Models (2024–2026)
+* **The Problem:** Generative simulation wastes enormous capacity predicting task-irrelevant visual entropy (rippling water, leaves, lighting changes), leading to compounding rollout drift and intractable action search spaces for long-horizon visual planning.
+* **The Breakthrough:** **Non-generative Joint-Embedding Predictive Architectures (JEPAs)** and **multi-scale temporal hierarchies**.
+* Yann LeCun and Meta's *V-JEPA* demonstrated that **predicting abstract feature representations** in a learned embedding space — abandoning pixel/token reconstruction altogether — yields vastly superior physical inductive bias and sample efficiency. *JEDI* bridged feature-space prediction with latent diffusion to handle multi-modal branch futures. Finally, *H-JEPA* established end-to-end **hierarchical world models**, decoupling planning across distinct timescales: higher levels discard fast, unpredictable noise to set abstract subgoals, while lower levels execute fine-grained control.
 
 ---
 
@@ -57,3 +62,4 @@ Here is a 17-paper roadmap broken down into three chronological phases.
 | **15** | 2024 | **Oasis** *(Decart & Etched)* | Latent Diffusion Transformer (DiT) | A **neural game engine** driven by a **Latent Diffusion Transformer (DiT)** that generates the next frame **autoregressively at inference time** in response to keyboard and mouse inputs. | [Project Oasis](https://oasis.decart.ai) | [GitHub](https://github.com/etched-ai/oasis-model) |
 | **16** | 2025 | **Dreamer 4** *(Hafner et al.)* | Block-Causal Transformer + Pretraining | Replaces the RSSM with a **block-causal Transformer** pretrained on large video datasets, enabling **long-horizon planning** over complex, temporally extended tasks. | [arXiv:2509.24527](https://arxiv.org/abs/2509.24527) | [Website / Code](https://danijar.com/project/dreamer4/) |
 | **17** | 2026 | **JEDI** *(Brunner et al.)* | JEPA Feature Space + Latent Diffusion | Combines **JEPA-style masked feature prediction** with **latent diffusion** to efficiently model a distribution over future trajectories — multiple possible futures without pixel-level blur. | [arXiv:2605.13013](https://arxiv.org/abs/2605.13013) | [arXiv Paper](https://arxiv.org/abs/2605.13013) |
+| **18** | 2026 | **H-JEPA** *(Zhang et al.)* | Hierarchical Action-Conditioned JEPA | Trains a **hierarchy of action-conditioned JEPAs** predicting across distinct timescales in separate latent spaces; higher levels discard fast, unpredictable details for top-down visual planning. | [arXiv:2610.06805](https://arxiv.org/abs/2610.06805) | [GitHub](https://github.com/kevinghst/H-JEPA) |
